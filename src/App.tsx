@@ -14,22 +14,18 @@ export default function App() {
   const [blinkSeconds, setBlinkSeconds] = useLocalStorage(20, 'blink_blinkSeconds');
   const [showSettings, setShowSettings] = useState(false);
   
-  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(() => {
+    return ('Notification' in window) ? Notification.permission : 'default';
+  });
 
   const { isIdle, requestPermission: requestIdlePermission, permissionGranted: idlePermissionGranted, isSupported: idleSupported } = useIdleDetection();
-  
+
   const { timeLeft, mode, resetTimer } = useBlinkTimer(
     isIdle,
     workMinutes * 60 * 1000,
     blinkSeconds * 1000,
     notificationPermission === 'granted' && idlePermissionGranted
   );
-
-  useEffect(() => {
-    if ('Notification' in window) {
-      setNotificationPermission(Notification.permission);
-    }
-  }, []);
 
   const handleRequestPermissions = async () => {
     if ('Notification' in window && Notification.permission !== 'granted') {

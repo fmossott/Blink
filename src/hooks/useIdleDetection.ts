@@ -6,10 +6,25 @@ export function useIdleDetection() {
   const [isSupported, setIsSupported] = useState(false);
 
   useEffect(() => {
-    if ('IdleDetector' in window) {
-      setIsSupported(true);
-      // Check existing permission silently if possible, but usually requires request
-    }
+    const checkPermissions = async () => {
+      if ('IdleDetector' in window) {
+        setIsSupported(true);
+        if (navigator.permissions && navigator.permissions.query) {
+          try {
+            const status = await navigator.permissions.query({ name: 'idle-detection' as PermissionName });
+            if (status.state === 'granted') {
+              setPermissionGranted(true);
+            }
+          } catch (e) {
+            console.error('Permission query failed', e);
+          }
+        }
+      } else {
+        // Fallback mode doesn't require IdleDetector permission
+        setPermissionGranted(true);
+      }
+    };
+    checkPermissions();
   }, []);
 
   const requestPermission = useCallback(async () => {
