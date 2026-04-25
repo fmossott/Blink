@@ -24,7 +24,7 @@ export function useBlinkTimer(
 
   const sendNotification = useCallback((title: string, body: string) => {
     if (Notification.permission === 'granted') {
-      new Notification(title, { body, icon: '/vite.svg' });
+      new Notification(title, { body, icon: '/vite.svg', silent: false });
     }
   }, []);
 
