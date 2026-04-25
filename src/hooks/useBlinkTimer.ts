@@ -10,14 +10,17 @@ export function useBlinkTimer(
 ) {
   const [timeLeft, setTimeLeft] = useState(workDurationMs);
   const [mode, setMode] = useState<Mode>('work');
-  const timerRef = useRef<number | null>(null);
+  const endTimeRef = useRef<number | null>(null);
 
   // Synchronize time left when settings change, but only if we are in work mode
   useEffect(() => {
     if (mode === 'work') {
        setTimeLeft(workDurationMs);
+       if (endTimeRef.current !== null) {
+         endTimeRef.current = Date.now() + workDurationMs;
+       }
     }
-  }, [workDurationMs]);
+  }, [workDurationMs, mode]);
 
   const sendNotification = useCallback((title: string, body: string) => {
     if (Notification.permission === 'granted') {
@@ -32,35 +35,49 @@ export function useBlinkTimer(
       // Reset and pause timer when idle
       setMode('work');
       setTimeLeft(workDurationMs);
+      endTimeRef.current = null;
       return;
     }
 
-    timerRef.current = window.setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1000) {
-          // Timer ended
-          if (mode === 'work') {
-            sendNotification('Time to Blink!', 'Look away from the screen and blink your eyes for 20 seconds.');
-            setMode('blink');
-            return blinkDurationMs;
-          } else {
-            sendNotification('Back to Work!', 'Your eyes are rested. You can look back at the screen now.');
-            setMode('work');
-            return workDurationMs;
-          }
+    // Initialize endTime if not set
+    if (endTimeRef.current === null) {
+      endTimeRef.current = Date.now() + (mode === 'work' ? workDurationMs : blinkDurationMs);
+    }
+
+    const interval = window.setInterval(() => {
+      if (endTimeRef.current === null) return;
+
+      const remaining = endTimeRef.current - Date.now();
+
+      if (remaining <= 1000) {
+        // Timer ended (using 1000ms threshold to handle background throttling jumps)
+        if (mode === 'work') {
+          sendNotification('Time to Blink!', 'Look away from the screen and blink your eyes for 20 seconds.');
+          setMode('blink');
+          endTimeRef.current = Date.now() + blinkDurationMs;
+          setTimeLeft(blinkDurationMs);
+        } else {
+          sendNotification('Back to Work!', 'Your eyes are rested. You can look back at the screen now.');
+          setMode('work');
+          endTimeRef.current = Date.now() + workDurationMs;
+          setTimeLeft(workDurationMs);
         }
-        return prev - 1000;
-      });
-    }, 1000);
+      } else {
+        setTimeLeft(remaining);
+      }
+    }, 500); // 500ms interval for smoother rendering
 
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      clearInterval(interval);
     };
   }, [isIdle, mode, workDurationMs, blinkDurationMs, permissionGranted, sendNotification]);
 
   const resetTimer = useCallback(() => {
     setMode('work');
     setTimeLeft(workDurationMs);
+    if (endTimeRef.current !== null) {
+      endTimeRef.current = Date.now() + workDurationMs;
+    }
   }, [workDurationMs]);
 
   return { timeLeft, mode, resetTimer };
